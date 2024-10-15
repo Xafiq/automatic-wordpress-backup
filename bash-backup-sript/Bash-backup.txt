@@ -1,0 +1,86 @@
+#DonSalvador.sh
+
+#! /bin/bash
+
+# paths & database credentials
+worpress_path="/var/www/html/wordpress"
+backup_path="/var/backups/wordpress"
+db_name="wordpress_db"
+db_user="wordpress_user"
+db_password="wordpressSuperSecurePassword"
+db_host="localhost"
+
+# if backup directory not existent, create it
+makdir -p "$backup_path"
+
+# date & time  for backup files name
+now=$(date +"%Y-%m-%d_%H-%M-%S")
+
+# Backup Wordpress site files
+site_backup_file="$backup_path/wordpress_files_$now.tar.gz"
+tar -czf "$site_backup_file" -C "$wordpress_path"
+
+# site backup control
+if [ $? -ne 0]; then
+    echo "Error: ¡NO se ha podido hacer la copia de seguridad del 'Wordpress site'!"
+    exit 1
+fi
+
+# Backup the Wordpress database
+db_backup_file="$backup_path/wordpress_db_$now.sql"
+mysqldump -h "$db_host" -u "$db_user" -p"$db_password" "$db_name" > "$db_backup_file"
+
+# data backup control
+if [ $? -ne 0]; then
+    echo "Error: ¡No se ha podido hacer la copia de seguridad de los Ẁordpress database'!"
+    rm -f "$site_backup_file" # Clean up if backup fails
+    exit 1
+fi
+
+# Create a compressed file will all backups
+final_backup_file="$backup_path/wordpress_backup_$now.tar.gz"
+tar -czf "$final_backup_file" -C "$backup_path" "wordpress_files_$now.tar.gz" "wordpress_db_$now.sql"
+
+# compressed backup control
+if [ $? -ne 0 ]; then
+    echo "Error: ¡No se ha podido comprir las copias de seguridad!"
+    rm -f "$site_backup_file" "$db_backup_file" # Clean up if backup fails
+    exit 1
+fi
+
+# Clean up individual backup files
+rm "$site_backup_file" "$db_backup_file"
+
+# control final backup integrity
+if ! tar -tzf "$final_backup_file" > /dev/null; then
+    echo "Error: ¡Fallo en la integridad de la copia de seguridad comprimida!
+    rm -f "$final_backup_file"  # Clean up if corrupted backup
+    exit 1
+fi
+
+echo "¡Se ha completado con exito la copia de seguridad! --> $final_backup_file <--"
+
+------------------------
+#DonSeguro.sh
+
+#!/bin/bash
+
+# def variables
+BACKUP_DIR="/var/backups/wordpress/wordpress_backup_$now.tar.gz" # Backup path
+LOCAL="/home/debian/Desktop/Backup-2" # path 2nd Backup diff device than 1st backup
+#REMOTE="adminserver@remotehost://Backup-3-remote"  # path 3rd Backup diff location
+
+# if dir path inexistent = create
+mkdir -p "~LOCAL"
+
+# Copy backup on different device on local location
+cp "$BACKUP_DIR" "$LOCAL"
+
+# Copy backup on remote location
+#scp "$BACKUP_DIR" "$REMOTE"
+
+echo "¡Backup 3-2-1 finalizado!"
+
+
+
+
